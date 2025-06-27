@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # Valkey Database
+  valkey:
+    image: valkey/valkey:latest
+    container_name: url-shortener-valkey
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    command: valkey-server --appendonly yes --appendfsync everysec
+    restart: unless-stopped
+    networks:
+      - url-shortener-network
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: url-shortener-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - REDIS_URL=redis://valkey:6379
+      - JWT_SECRET=your-production-jwt-secret-change-this
+      - FRONTEND_URL=http://localhost:3000
+    depends_on:
+      - valkey
+    restart: unless-stopped
+    networks:
+      - url-shortener-network
+
+  # Frontend Application
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: url-shortener-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - url-shortener-network
+
+volumes:
+  valkey_data:
+
+networks:
+  url-shortener-network:
+    driver: bridge
